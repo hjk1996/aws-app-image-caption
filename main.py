@@ -26,7 +26,11 @@ def process_image_message(message) -> bool:
     try:
         # Parse the message
         message_body = json.loads(message["Body"])
-        s3_info = message_body["Records"][0]["s3"]
+        # Additional parsing for the inner JSON string contained in the "Message" field
+        inner_message_body = json.loads(message_body["Message"])
+
+        # Now using inner_message_body for S3 info extraction
+        s3_info = inner_message_body["Records"][0]["s3"]
         bucket_name = s3_info["bucket"]["name"]
         object_key = s3_info["object"]["key"]
 
@@ -69,7 +73,7 @@ def poll_sqs_messages():
     while True:
         try:
             response = sqs.receive_message(
-                QueueUrl=sqs_url, MaxNumberOfMessages=1, WaitTimeSeconds=20
+                QueueUrl=sqs_url, MaxNumberOfMessages=2, WaitTimeSeconds=20
             )
             logging.info("Response: %s", response)
             messages = response.get("Messages", [])
