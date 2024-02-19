@@ -13,7 +13,7 @@ sqs = boto3.client("sqs")
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 sqs_url = os.environ["SQS_URL"]
-table = dynamodb.Table(os.environ["DYNAMODB_TABLE"])
+table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
 
 # Load the model
 processor = BlipProcessor.from_pretrained("./model")
