@@ -8,3 +8,4 @@ model = BlipForConditionalGeneration.from_pretrained(
 
 processor.save_pretrained("./model")
 model.save_pretrained("./model")
+
