@@ -8,6 +8,11 @@ from PIL import Image, UnidentifiedImageError
 import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
 # Initialize AWS services
 sqs = boto3.client("sqs")
 s3 = boto3.client("s3")
@@ -22,7 +27,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 
-def process_image_message(message) -> bool:
+def process_image_message(message) -> dict[str, str]:
     try:
         # Parse the message
         message_body = json.loads(message["Body"])
@@ -49,52 +54,60 @@ def process_image_message(message) -> bool:
         outputs = model.generate(**inputs)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
 
-        # Store the caption in DynamoDB
-        response = table.put_item(
-            Item={"file_name": file_name, "user_id": user_id, "caption": caption}
-        )
-        logging.info(f"Image {object_key} processed. Caption: {caption}")
-        return True
+        logger.info(f"Image {object_key} processed. Caption: {caption}")
+        return {
+            "user_id": user_id,
+            "file_name": file_name,
+            "caption": caption,
+        }
     except json.JSONDecodeError:
-        logging.error("Failed to decode JSON message.")
-        return False
+        logger.error("Failed to decode JSON message.")
     except KeyError as e:
-        logging.error(f"Missing key in message: {e}")
-        return False
+        logger.error(f"Missing key in message: {e}")
     except UnidentifiedImageError:
-        logging.error(f"Failed to identify image: {object_key}")
-        return False
+        logger.error(f"Failed to identify image: {object_key}")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-        return False
+        logger.error(f"Unexpected error: {e}")
 
 
 def poll_sqs_messages():
     while True:
         try:
             response = sqs.receive_message(
-                QueueUrl=sqs_url, MaxNumberOfMessages=2, WaitTimeSeconds=20
+                QueueUrl=sqs_url, MaxNumberOfMessages=10, WaitTimeSeconds=20
             )
             messages = response.get("Messages", [])
+            
             if not messages:
                 continue
-
+            
+            captions = []
+            entries = []
             for message in messages:
-                ok = process_image_message(message)
+                caption = process_image_message(message)
                 # Delete the message from the queue
-                if ok:
-                    sqs.delete_message(
-                        QueueUrl=sqs_url, ReceiptHandle=message["ReceiptHandle"]
+                if caption:
+                    captions.append(caption)
+                    entries.append(
+                        {"Id": message["MessageId"], "ReceiptHandle": message["ReceiptHandle"]}
                     )
+            
+            if captions:
+                with table.batch_writer() as writer:
+                    for caption in captions:
+                        writer.put_item(Item=caption)
+                logger.info(f"Added {len(captions)} items to the DynamoDB table.")
+                sqs.delete_messages(Entries=entries)
+                logger.info(f"Deleted {len(entries)} messages from the queue.")
+            
         except Exception as e:
-            logging.error(f"Error polling SQS messages: {e}")
+            logger.error(f"Error polling SQS messages: {e}")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     try:
         poll_sqs_messages()
     except KeyboardInterrupt:
-        logging.info("Process interrupted by user.")
+        logger.info("Process interrupted by user.")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
