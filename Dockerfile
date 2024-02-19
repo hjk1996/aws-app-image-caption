@@ -1,6 +1,7 @@
 FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-runtime AS base
 RUN pip install transformers
 ADD download_model.py /app/download_model.py
+WORKDIR /app
 RUN python /app/download_model.py
 
 
