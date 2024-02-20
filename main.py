@@ -103,6 +103,7 @@ async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
             Key={"user_id": data["user_id"], "file_name": data["file_name"]},
             UpdateExpression="set caption = :c",
             ExpressionAttributeValues={":c": data["caption"]},
+            ConditionExpression="attribute_exists(user_id) AND attribute_exists(file_name)",
             ReturnValues="ALL_NEW",
         )
         return True
