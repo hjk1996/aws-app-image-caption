@@ -18,9 +18,13 @@ logger.setLevel(logging.DEBUG)
 
 # Initialize AWS services
 sqs = boto3.client("sqs")
+queue_name = os.environ["QUEUE_NAME"]
+queue_url = sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
+queue = sqs.Queue(queue_url)
+
+
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
-sqs_url = os.environ["SQS_URL"]
 table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
 
 # Load the model
@@ -78,7 +82,7 @@ def process_image_message(message) -> dict[str, str]:
         logger.error(f"[{type(e)}]: Failed to identify image: {object_key}")
     except S3ImageDoesNotExistError as e:
         logger.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
-        sqs.delete_message(QueueUrl=sqs_url, ReceiptHandle=message["ReceiptHandle"])
+        queue.delete_message(ReceiptHandle=message["ReceiptHandle"])
     except Exception as e:
         logger.error(f"[{type(e)}]: Unexpected error: {e}")
 
@@ -86,9 +90,7 @@ def process_image_message(message) -> dict[str, str]:
 def poll_sqs_messages():
     while True:
         try:
-            response = sqs.receive_message(
-                QueueUrl=sqs_url, MaxNumberOfMessages=10, WaitTimeSeconds=20
-            )
+            response = queue.receive_message(MaxNumberOfMessages=10, WaitTimeSeconds=20)
             messages = response.get("Messages", [])
             
             if not messages:
@@ -112,7 +114,7 @@ def poll_sqs_messages():
                     for caption in captions:
                         writer.put_item(Item=caption)
                 logger.info(f"Added {len(captions)} items to the DynamoDB table.")
-                sqs.delete_messages(Entries=entries)
+                queue.delete_messages(Entries=entries)
                 logger.info(f"Deleted {len(entries)} messages from the queue.")
             
         except Exception as e:
