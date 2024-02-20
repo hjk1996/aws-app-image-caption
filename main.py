@@ -11,12 +11,12 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from errors import S3ImageDoesNotExistError
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
+)
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
-
-logger.info("Loading Client")
+logging.info("Loading Model")
 
 
 # Initialize AWS services
@@ -28,10 +28,9 @@ s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
 
-logger.info("Client Loaded")
+logging.info("AWS services initialized")
 
-logger.info("Loading Model")
-
+logging.info("Loading Model")
 # Load the model
 processor = BlipProcessor.from_pretrained("./model")
 model = BlipForConditionalGeneration.from_pretrained("./model")
@@ -71,24 +70,24 @@ def process_image_message(message) -> dict[str, str]:
         outputs = model.generate(**inputs)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
 
-        logger.info(f"Image {object_key} processed. Caption: {caption}")
+        logging.info(f"Image {object_key} processed. Caption: {caption}")
         return {
             "user_id": user_id,
             "file_name": file_name,
             "caption": caption,
         }
     except json.JSONDecodeError as e:
-        logger.error(f"[{type(e)}]: Failed to decode JSON message.")
+        logging.error(f"[{type(e)}]: Failed to decode JSON message.")
     except KeyError as e:
-        logger.error(f"[{type(e)}]: Missing key in message: {e}")
+        logging.error(f"[{type(e)}]: Missing key in message: {e}")
     except UnidentifiedImageError:
-        logger.error(f"[{type(e)}]: Failed to identify image: {object_key}")
+        logging.error(f"[{type(e)}]: Failed to identify image: {object_key}")
     except S3ImageDoesNotExistError as e:
-        logger.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
+        logging.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
         sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
 
     except Exception as e:
-        logger.error(f"[{type(e)}]: Unexpected error: {e}")
+        logging.error(f"[{type(e)}]: Unexpected error: {e}")
 
 
 def poll_sqs_messages():
@@ -100,7 +99,7 @@ def poll_sqs_messages():
             messages = response.get("Messages", [])
 
             if not messages:
-                logger.info("No messages to process. Sleeping for 5 seconds.")
+                logging.info("No messages to process. Sleeping for 5 seconds.")
                 continue
 
             captions = []
@@ -121,19 +120,19 @@ def poll_sqs_messages():
                 with table.batch_writer() as writer:
                     for caption in captions:
                         writer.put_item(Item=caption)
-                logger.info(f"Added {len(captions)} items to the DynamoDB table.")
+                logging.info(f"Added {len(captions)} items to the DynamoDB table.")
                 sqs.delete_message_batch(QueueUrl=queue_url, Entries=entries)
-                logger.info(f"Deleted {len(entries)} messages from the queue.")
+                logging.info(f"Deleted {len(entries)} messages from the queue.")
 
         except Exception as e:
-            logger.error(f"{[type(e)]}: Error polling SQS messages: {e}")
+            logging.error(f"{[type(e)]}: Error polling SQS messages: {e}")
 
 
 if __name__ == "__main__":
-    logger.info("Starting the process.")
+    logging.info("Starting the process.")
     try:
         poll_sqs_messages()
     except KeyboardInterrupt as e:
-        logger.info(f"[{type(e)}]: Process interrupted by user.")
+        logging.info(f"[{type(e)}]: Process interrupted by user.")
     except Exception as e:
-        logger.error(f"[{type(e)}]: Unexpected error: {e}")
+        logging.error(f"[{type(e)}]: Unexpected error: {e}")
