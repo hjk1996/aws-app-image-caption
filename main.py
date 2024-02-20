@@ -5,10 +5,17 @@ import json
 import boto3
 import time
 
-from PIL import Image, UnidentifiedImageError
+from PIL import UnidentifiedImageError
 import torch
-from transformers import BlipProcessor, BlipForConditionalGeneration
+import torch.nn.functional as F
+from transformers import (
+    BlipProcessor,
+    BlipForConditionalGeneration,
+    AutoTokenizer,
+    AutoModel,
+)
 
+from utils import download_image_from_s3, get_sentence_embedding
 from errors import S3ImageDoesNotExistError
 
 logging.basicConfig(
@@ -30,22 +37,17 @@ table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
 
 logging.info("AWS services initialized")
 
-logging.info("Loading Model")
+logging.info("Loading Image Caption Model")
 # Load the model
 processor = BlipProcessor.from_pretrained("./model")
 model = BlipForConditionalGeneration.from_pretrained("./model")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
-
-def download_image_from_s3(bucket_name, object_key) -> Image.Image:
-    try:
-        file_stream = io.BytesIO()
-        s3.download_fileobj(bucket_name, object_key, file_stream)
-        file_stream.seek(0)
-        return Image.open(file_stream)
-    except Exception as e:
-        raise S3ImageDoesNotExistError(f"Image {object_key} does not exist in S3.")
+logging.info("Loading Sentence Embedding Model")
+embedding_model = AutoModel.from_pretrained("./embedding_model")
+tokenizer = AutoTokenizer.from_pretrained("./embedding_model")
+embedding_model.to(device)
 
 
 def process_image_message(message) -> dict[str, str]:
@@ -64,7 +66,7 @@ def process_image_message(message) -> dict[str, str]:
         file_name = attributes[-1]
         user_id = attributes[1]
 
-        image = download_image_from_s3(bucket_name, object_key)
+        image = download_image_from_s3(s3, bucket_name, object_key)
 
         inputs = processor(images=image, return_tensors="pt").to(device)
         outputs = model.generate(
@@ -73,6 +75,9 @@ def process_image_message(message) -> dict[str, str]:
         )
         caption = processor.decode(outputs[0], skip_special_tokens=True)
         logging.info(f"Image {object_key} processed. Caption: {caption}")
+        caption_embedding = get_sentence_embedding(tokenizer, embedding_model, device, caption)
+        logging.info(f"Caption embedding: {caption_embedding.size()}")
+
         return {
             "user_id": user_id,
             "file_name": file_name,
