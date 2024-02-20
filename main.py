@@ -3,10 +3,13 @@ import io
 import logging
 import json
 import boto3
+import botocore
 
 from PIL import Image, UnidentifiedImageError
 import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
+
+from errors import S3ImageDoesNotExistError
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +30,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 
+def download_image_from_s3(bucket_name, object_key) -> Image.Image:
+    try:
+        file_stream = io.BytesIO()
+        s3.download_fileobj(bucket_name, object_key, file_stream)
+        file_stream.seek(0)
+        return Image.open(file_stream)
+    except Exception as e:
+        raise S3ImageDoesNotExistError(f"Image {object_key} does not exist in S3.")
+
+
 def process_image_message(message) -> dict[str, str]:
     try:
         # Parse the message
@@ -43,13 +56,10 @@ def process_image_message(message) -> dict[str, str]:
         file_name = attributes[-1]
         user_id = attributes[1]
 
-        # Get the object from S3 and read it into memory
-        file_stream = io.BytesIO()
-        s3.download_fileobj(bucket_name, object_key, file_stream)
-        file_stream.seek(0)  # Move to the start of the file-like object
 
-        # Open the image directly from the in-memory bytes
-        image = Image.open(file_stream)
+
+        image = download_image_from_s3(bucket_name, object_key)
+            
         inputs = processor(images=image, return_tensors="pt").to(device)
         outputs = model.generate(**inputs)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
@@ -66,6 +76,9 @@ def process_image_message(message) -> dict[str, str]:
         logger.error(f"[{type(e)}]: Missing key in message: {e}")
     except UnidentifiedImageError:
         logger.error(f"[{type(e)}]: Failed to identify image: {object_key}")
+    except S3ImageDoesNotExistError as e:
+        logger.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
+        sqs.delete_message(QueueUrl=sqs_url, ReceiptHandle=message["ReceiptHandle"])
     except Exception as e:
         logger.error(f"[{type(e)}]: Unexpected error: {e}")
 
