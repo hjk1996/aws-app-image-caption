@@ -100,6 +100,7 @@ def poll_sqs_messages():
 
             if not messages:
                 logging.info("No messages to process. Sleeping for 5 seconds.")
+                time.sleep(5)
                 continue
 
             captions = []
