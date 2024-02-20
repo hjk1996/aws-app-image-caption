@@ -60,14 +60,14 @@ def process_image_message(message) -> dict[str, str]:
             "file_name": file_name,
             "caption": caption,
         }
-    except json.JSONDecodeError:
-        logger.error("Failed to decode JSON message.")
+    except json.JSONDecodeError as e:
+        logger.error(f"[{type(e)}]: Failed to decode JSON message.")
     except KeyError as e:
-        logger.error(f"Missing key in message: {e}")
+        logger.error(f"[{type(e)}]: Missing key in message: {e}")
     except UnidentifiedImageError:
-        logger.error(f"Failed to identify image: {object_key}")
+        logger.error(f"[{type(e)}]: Failed to identify image: {object_key}")
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"[{type(e)}]: Unexpected error: {e}")
 
 
 def poll_sqs_messages():
@@ -101,13 +101,13 @@ def poll_sqs_messages():
                 logger.info(f"Deleted {len(entries)} messages from the queue.")
             
         except Exception as e:
-            logger.error(f"Error polling SQS messages: {e}")
+            logger.error(f"{[type(e)]}: Error polling SQS messages: {e}")
 
 
 if __name__ == "__main__":
     try:
         poll_sqs_messages()
-    except KeyboardInterrupt:
-        logger.info("Process interrupted by user.")
+    except KeyboardInterrupt as e:
+        logger.info(f"[{type(e)}]: Process interrupted by user.")
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"[{type(e)}]: Unexpected error: {e}")
