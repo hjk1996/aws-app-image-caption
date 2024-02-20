@@ -111,7 +111,8 @@ async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
         return False    
 
 
-async def poll_sqs_messages():
+async def main():
+    logging.info("Starting the process.")
     while True:
         try:
             response = sqs.receive_message(
@@ -143,26 +144,18 @@ async def poll_sqs_messages():
                     *[update_dynamodb_table(table, caption) for caption in captions]
                 )
                 logging.info(f"Added {sum(results)} items to the DynamoDB table.")
-            
+
             valid_entries = [entry for entry, result in zip(entries, results) if result]
-            
+
             if valid_entries:
                 sqs.delete_message_batch(QueueUrl=queue_url, Entries=valid_entries)
                 logging.info(f"Deleted {len(entries)} messages from the queue.")
 
+        except KeyboardInterrupt as e:
+            logging.info(f"[{type(e)}]: Process interrupted by user.")
         except Exception as e:
             logging.error(f"{[type(e)]}: Error polling SQS messages: {e}")
 
 
-async def main():
-    try:
-        poll_sqs_messages()
-    except KeyboardInterrupt as e:
-        logging.info(f"[{type(e)}]: Process interrupted by user.")
-    except Exception as e:
-        logging.error(f"[{type(e)}]: Unexpected error: {e}")
-
-
 if __name__ == "__main__":
-    logging.info("Starting the process.")
     asyncio.run(main())
