@@ -19,11 +19,9 @@ logger.setLevel(logging.DEBUG)
 logger.info("Loading Client")
 
 
-
 # Initialize AWS services
 sqs = boto3.client("sqs")
-queue_name = os.environ["QUEUE_NAME"]
-queue_url = sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
+queue_url = os.environ["SQS_URL"]
 
 
 s3 = boto3.client("s3")
