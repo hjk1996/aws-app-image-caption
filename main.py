@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+logger.info("Loading Client")
+
+
+
 # Initialize AWS services
 sqs = boto3.client("sqs")
 queue_name = os.environ["QUEUE_NAME"]
@@ -25,6 +29,10 @@ queue_url = sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
+
+logger.info("Client Loaded")
+
+logger.info("Loading Model")
 
 # Load the model
 processor = BlipProcessor.from_pretrained("./model")
@@ -124,6 +132,7 @@ def poll_sqs_messages():
 
 
 if __name__ == "__main__":
+    logger.info("Starting the process.")
     try:
         poll_sqs_messages()
     except KeyboardInterrupt as e:
