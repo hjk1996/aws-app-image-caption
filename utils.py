@@ -1,3 +1,5 @@
+import io
+
 from PIL import Image
 
 import torch
