@@ -67,7 +67,7 @@ def process_image_message(message) -> dict[str, str]:
         image = download_image_from_s3(bucket_name, object_key)
 
         inputs = processor(images=image, return_tensors="pt").to(device)
-        outputs = model.generate(**inputs, max_new_tokens=150, early_stopping=True)
+        outputs = model.generate(**inputs, max_new_tokens=300, early_stopping=True)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
         logging.info(f"Image {object_key} processed. Caption: {caption}")
         return {
