@@ -20,7 +20,6 @@ logger.setLevel(logging.DEBUG)
 sqs = boto3.client("sqs")
 queue_name = os.environ["QUEUE_NAME"]
 queue_url = sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
-queue = sqs.Queue(queue_url)
 
 
 s3 = boto3.client("s3")
@@ -60,10 +59,8 @@ def process_image_message(message) -> dict[str, str]:
         file_name = attributes[-1]
         user_id = attributes[1]
 
-
-
         image = download_image_from_s3(bucket_name, object_key)
-            
+
         inputs = processor(images=image, return_tensors="pt").to(device)
         outputs = model.generate(**inputs)
         caption = processor.decode(outputs[0], skip_special_tokens=True)
@@ -82,7 +79,8 @@ def process_image_message(message) -> dict[str, str]:
         logger.error(f"[{type(e)}]: Failed to identify image: {object_key}")
     except S3ImageDoesNotExistError as e:
         logger.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
-        queue.delete_message(ReceiptHandle=message["ReceiptHandle"])
+        sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+
     except Exception as e:
         logger.error(f"[{type(e)}]: Unexpected error: {e}")
 
@@ -90,14 +88,17 @@ def process_image_message(message) -> dict[str, str]:
 def poll_sqs_messages():
     while True:
         try:
-            response = queue.receive_message(MaxNumberOfMessages=10, WaitTimeSeconds=20)
+            response = sqs.receive_message(
+                QueueUrl=queue_url, MaxNumberOfMessages=10, WaitTimeSeconds=20
+            )
             messages = response.get("Messages", [])
-            
+
+
             if not messages:
                 logger.info("No messages in the queue. Polling again in 5 seconds.")
                 time.sleep(5)
                 continue
-            
+
             captions = []
             entries = []
             for message in messages:
@@ -106,17 +107,20 @@ def poll_sqs_messages():
                 if caption:
                     captions.append(caption)
                     entries.append(
-                        {"Id": message["MessageId"], "ReceiptHandle": message["ReceiptHandle"]}
+                        {
+                            "Id": message["MessageId"],
+                            "ReceiptHandle": message["ReceiptHandle"],
+                        }
                     )
-            
+
             if captions:
                 with table.batch_writer() as writer:
                     for caption in captions:
                         writer.put_item(Item=caption)
                 logger.info(f"Added {len(captions)} items to the DynamoDB table.")
-                queue.delete_messages(Entries=entries)
+                sqs.delete_message_batch(QueueUrl=queue_url, Entries=entries)
                 logger.info(f"Deleted {len(entries)} messages from the queue.")
-            
+
         except Exception as e:
             logger.error(f"{[type(e)]}: Error polling SQS messages: {e}")
 
