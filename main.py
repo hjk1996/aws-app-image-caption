@@ -93,10 +93,8 @@ def poll_sqs_messages():
             )
             messages = response.get("Messages", [])
 
-
             if not messages:
-                logger.info("No messages in the queue. Polling again in 5 seconds.")
-                time.sleep(5)
+                logger.info("No messages to process. Sleeping for 5 seconds.")
                 continue
 
             captions = []
