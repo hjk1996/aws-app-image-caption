@@ -70,9 +70,6 @@ def process_image_message(message) -> dict[str, str]:
         outputs = model.generate(
             **inputs,
             max_new_tokens=300,
-            top_k=50,  # 확률 순위가 50위 밖인 토큰은 샘플링에서 제외
-            top_p=0.95,  # 누적 확률이 95%인 후보집합에서만 생성
-            do_sample=True,  # 샘플링 전략 사용
         )
         caption = processor.decode(outputs[0], skip_special_tokens=True)
         logging.info(f"Image {object_key} processed. Caption: {caption}")
