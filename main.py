@@ -3,7 +3,7 @@ import io
 import logging
 import json
 import boto3
-import botocore
+import time
 
 from PIL import Image, UnidentifiedImageError
 import torch
@@ -92,6 +92,7 @@ def poll_sqs_messages():
             messages = response.get("Messages", [])
             
             if not messages:
+                time.sleep(5)
                 continue
             
             captions = []
