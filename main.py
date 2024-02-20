@@ -1,5 +1,5 @@
 import os
-import io
+import asyncio
 import logging
 import json
 import boto3
@@ -97,7 +97,21 @@ def process_image_message(message) -> dict[str, str]:
         logging.error(f"[{type(e)}]: Unexpected error: {e}")
 
 
-def poll_sqs_messages():
+async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
+    try:
+        table.update_item(
+            Key={"user_id": data["user_id"], "file_name": data["file_name"]},
+            UpdateExpression="set caption = :c",
+            ExpressionAttributeValues={":c": data["caption"]},
+            ReturnValues="ALL_NEW",
+        )
+        return True
+    except Exception as e:
+        logging.error(f"[{type(e)}]: Error updating DynamoDB table: {e}")
+        return False    
+
+
+async def poll_sqs_messages():
     while True:
         try:
             response = sqs.receive_message(
@@ -125,22 +139,30 @@ def poll_sqs_messages():
                     )
 
             if captions:
-                with table.batch_writer() as writer:
-                    for caption in captions:
-                        writer.put_item(Item=caption)
-                logging.info(f"Added {len(captions)} items to the DynamoDB table.")
-                sqs.delete_message_batch(QueueUrl=queue_url, Entries=entries)
+                results = await asyncio.gather(
+                    *[update_dynamodb_table(table, caption) for caption in captions]
+                )
+                logging.info(f"Added {sum(results)} items to the DynamoDB table.")
+            
+            valid_entries = [entry for entry, result in zip(entries, results) if result]
+            
+            if valid_entries:
+                sqs.delete_message_batch(QueueUrl=queue_url, Entries=valid_entries)
                 logging.info(f"Deleted {len(entries)} messages from the queue.")
 
         except Exception as e:
             logging.error(f"{[type(e)]}: Error polling SQS messages: {e}")
 
 
-if __name__ == "__main__":
-    logging.info("Starting the process.")
+async def main():
     try:
         poll_sqs_messages()
     except KeyboardInterrupt as e:
         logging.info(f"[{type(e)}]: Process interrupted by user.")
     except Exception as e:
         logging.error(f"[{type(e)}]: Unexpected error: {e}")
+
+
+if __name__ == "__main__":
+    logging.info("Starting the process.")
+    asyncio.run(main())
