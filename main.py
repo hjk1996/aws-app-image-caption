@@ -183,7 +183,6 @@ async def main():
                 logging.info("No messages to process. Sleeping for 5 seconds.")
                 await asyncio.sleep(5)
                 continue
-
             captions = []
             entries = []
             for message in messages:
