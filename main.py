@@ -151,9 +151,10 @@ async def save_vector_to_opensearch(os_client: OpenSearch, data: dict) -> bool:
     try:
         response = os_client.index(
             index=os.environ["OPENSEARCH_INDEX"],
-            id=data["file_name"],
             body={
                 "user_id": data["user_id"],
+                "file_name": data["file_name"],
+            
                 "caption_vector": data["caption_vector"],
                 "created_at": int(time.time()),
             },
