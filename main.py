@@ -53,7 +53,7 @@ else:
 
 
 mongo_client = MongoClient(
-    f"mongodb://{secret['username']}:{secret['password']}@{secret['host']}:{secret['port']}/?tls={secret['ssl']}&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+    f"mongodb://{secret['username']}:{secret['password']}@{secret['host']}:{secret['port']}/?tls=true&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
 )
 logging.info("Connected to DocumentDB")
 db = mongo_client["image_metadata"]
