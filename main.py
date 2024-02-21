@@ -162,6 +162,7 @@ async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
                 "caption_vector": data["caption_vector"],
             }
         )
+        logging.info(f"Inserted document with id: {result.inserted_id}")
         return True
     except Exception as e:
         logging.error(f"[{type(e)}]: Error inserting document in MongoDB: {e}")
