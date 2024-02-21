@@ -57,7 +57,7 @@ logging.info("AWS services initialized")
 credentials = boto3.Session().get_credentials()
 auth = AWSV4SignerAuth(credentials=credentials, region=os.environ["AWS_REGION"])
 os_client = OpenSearch(
-    hosts=[{"host": os.environ["OPENSEARCH_ENDPOINT"], "port": 443}],
+    hosts={"host": os.environ["OPENSEARCH_ENDPOINT"], "port": 443},
     http_auth=auth,
     use_ssl=True,
     verify_certs=True,
@@ -125,7 +125,6 @@ def process_image_message(message) -> dict[str, str]:
     except S3ImageDoesNotExistError as e:
         logging.error(f"[{type(e)}]: Image {object_key} does not exist in S3.")
         sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
-
     except Exception as e:
         logging.error(f"[{type(e)}]: Unexpected error: {e}")
 
