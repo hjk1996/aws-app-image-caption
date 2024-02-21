@@ -29,20 +29,6 @@ logging.basicConfig(
 
 logging.info("Loading Model")
 
-# 종료 플래그를 정의합니다.
-shutdown_flag = False
-
-
-def signal_handler(signum, frame):
-    global shutdown_flag
-    logging.info("SIGTERM received, shutting down...")
-    shutdown_flag = True
-
-
-# SIGTERM 신호 핸들러를 등록합니다.
-signal.signal(signal.SIGTERM, signal_handler)
-
-
 # Initialize AWS services
 sqs = boto3.client("sqs")
 queue_url = os.environ["SQS_URL"]
@@ -55,6 +41,7 @@ logging.info("AWS services initialized")
 
 
 credentials = boto3.Session().get_credentials()
+logging.info(f"AWS credentials initialized: {credentials}")
 service = "aoss"
 auth = AWSV4SignerAuth(credentials=credentials, region=os.environ["AWS_REGION"], service=service)
 os_client = OpenSearch(
@@ -80,6 +67,21 @@ logging.info("Loading Sentence Embedding Model")
 embedding_model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 embedding_model.to(device)
+
+
+# 종료 플래그를 정의합니다.
+shutdown_flag = False
+
+
+def signal_handler(signum, frame):
+    global shutdown_flag
+    logging.info("SIGTERM received, shutting down...")
+    shutdown_flag = True
+    os_client.close()
+
+
+# SIGTERM 신호 핸들러를 등록합니다.
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 def process_image_message(message) -> dict[str, str]:
