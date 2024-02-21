@@ -57,7 +57,7 @@ logging.info("AWS services initialized")
 credentials = boto3.Session().get_credentials()
 auth = AWSV4SignerAuth(credentials=credentials, region=os.environ["AWS_REGION"])
 os_client = OpenSearch(
-    hosts=[{"host": os.environ["OPENSEARCH_ENDPOINT"]}],
+    hosts=[{"host": os.environ["OPENSEARCH_ENDPOINT"], "port": 443}],
     http_auth=auth,
     use_ssl=True,
     verify_certs=True,
