@@ -10,5 +10,4 @@ RUN python download_model.py
 ADD errors.py /app
 ADD utils.py /app
 ADD main.py /app
-ADD global-bundle.pem /app
 CMD ["python", "main.py"]

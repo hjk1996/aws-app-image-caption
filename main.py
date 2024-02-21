@@ -7,6 +7,7 @@ import time
 import signal
 
 
+import requests
 from PIL import UnidentifiedImageError
 from pymongo import MongoClient
 from pymongo.collection import Collection
@@ -19,7 +20,7 @@ from transformers import (
     AutoModel,
 )
 
-from utils import download_image_from_s3, get_sentence_embedding, get_secret
+from utils import download_image_from_s3, get_sentence_embedding, get_secret, download_pem_file
 from errors import S3ImageDoesNotExistError
 
 
@@ -42,6 +43,14 @@ logging.info("AWS services initialized")
 
 secret = get_secret()
 logging.info("Getting DocumentDB secret")
+
+download_success = download_pem_file()
+if not download_success:
+    logging.error("Failed to download global-bundle.pem file.")
+    exit(1)
+else:
+    logging.info("Downloaded global-bundle.pem file.")
+
 
 mongo_client = MongoClient(
     f"mongodb://{secret['username']}:{secret['password']}@{secret['host']}:{secret['port']}/?tls={secret['ssl']}&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
