@@ -52,14 +52,16 @@ logging.info("OpenSearch client initialized")
 
 logging.info("Loading Image Caption Model")
 # Load the model
-processor = BlipProcessor.from_pretrained("./model")
-model = BlipForConditionalGeneration.from_pretrained("./model")
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+model = BlipForConditionalGeneration.from_pretrained(
+    "Salesforce/blip-image-captioning-large"
+)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 logging.info("Loading Sentence Embedding Model")
-embedding_model = AutoModel.from_pretrained("./embedding_model")
-tokenizer = AutoTokenizer.from_pretrained("./embedding_model")
+embedding_model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
+tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L12-v2")
 embedding_model.to(device)
 
 
