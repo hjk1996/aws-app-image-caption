@@ -44,7 +44,7 @@ secret = get_secret()
 logging.info("Getting DocumentDB secret")
 
 mongo_client = MongoClient(
-    f"mongodb://{secret["user"]}:{secret["password"]}@{secret["host"]}:{secret["port"]}/?tls={secret["ssl"]}&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+    f"mongodb://{secret['user']}:{secret['password']}@{secret['host']}:{secret['port"']}/?tls={secret['ssl']}&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
 )
 logging.info("Connected to DocumentDB")
 db = mongo_client["image_metadata"]
