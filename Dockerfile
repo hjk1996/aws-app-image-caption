@@ -5,6 +5,7 @@ ENV DYNAMODB_TABLE_NAME=AppImageCaption
 ENV OPENSEARCH_ENDPOINT=https://5pmqemvn6b1li4yn88nk.us-east-1.aoss.amazonaws.com
 WORKDIR /app
 RUN mkdir /app/model
+RUN wget https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 ADD download_model.py /app
 RUN python download_model.py
 ADD errors.py /app
