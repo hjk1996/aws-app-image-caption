@@ -8,7 +8,8 @@ import signal
 
 
 from PIL import UnidentifiedImageError
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
+from pymongo import MongoClient
+from pymongo.collection import Collection
 import torch
 import torch.nn.functional as F
 from transformers import (
@@ -18,7 +19,7 @@ from transformers import (
     AutoModel,
 )
 
-from utils import download_image_from_s3, get_sentence_embedding
+from utils import download_image_from_s3, get_sentence_embedding, get_secret
 from errors import S3ImageDoesNotExistError
 
 
@@ -39,19 +40,15 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
 logging.info("AWS services initialized")
 
+secret = get_secret()
+logging.info("Getting DocumentDB secret")
 
-credentials = boto3.Session().get_credentials()
-logging.info(f"AWS credentials initialized: {credentials}")
-service = "aoss"
-auth = AWSV4SignerAuth(credentials=credentials, region=os.environ["AWS_REGION"], service=service)
-os_client = OpenSearch(
-    hosts=[{"host": os.environ["OPENSEARCH_ENDPOINT"], "port": 443}],
-    http_auth=auth,
-    use_ssl=True,
-    verify_certs=True,
-    connection_class=RequestsHttpConnection,
+mongo_client = MongoClient(
+    f"mongodb://{secret["user"]}:{secret["password"]}@{secret["host"]}:{secret["port"]}/?tls={secret["ssl"]}&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
 )
-logging.info("OpenSearch client initialized")
+logging.info("Connected to DocumentDB")
+db = mongo_client["image_metadata"]
+collection = db["caption_vector"]
 
 
 logging.info("Loading Image Caption Model")
@@ -77,8 +74,8 @@ def signal_handler(signum, frame):
     global shutdown_flag
     logging.info("SIGTERM received, shutting down...")
     shutdown_flag = True
-    os_client.close()
-
+    mongo_client.close()
+    
 
 # SIGTERM 신호 핸들러를 등록합니다.
 signal.signal(signal.SIGTERM, signal_handler)
@@ -147,31 +144,30 @@ async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
         return False
 
 
-async def save_vector_to_opensearch(os_client: OpenSearch, data: dict) -> bool:
+async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
     try:
-        response = os_client.index(
-            index=os.environ["OPENSEARCH_INDEX"],
-            body={
+        result = collection.insert_one(
+            {
                 "user_id": data["user_id"],
                 "file_name": data["file_name"],
-            
                 "caption_vector": data["caption_vector"],
-                "created_at": int(time.time()),
-            },
+            }
         )
-        
         return True
     except Exception as e:
-        logging.error(f"[{type(e)}]: Error indexing document in OpenSearch: {e}")
+        logging.error(f"[{type(e)}]: Error inserting document in MongoDB: {e}")
         return False
 
 
+
+
+
 async def update_table_and_save_vector(
-    table, os_client: OpenSearch, data: dict[str, str]
+    table, collection: Collection, data: dict[str, str]
 ) -> bool:
     result = await update_dynamodb_table(table, data)
     if result:
-        result = await save_vector_to_opensearch(os_client, data)
+        result = await save_vector_to_mongodb(collection, data)
     return result
 
 
@@ -206,7 +202,7 @@ async def main():
                 results = await asyncio.gather(
                     *[
                         update_table_and_save_vector(
-                            table=table, os_client=os_client, data=caption
+                            table=table, collection=collection, data=caption
                         )
                         for caption in captions
                     ]

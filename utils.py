@@ -1,14 +1,17 @@
 import io
 
+import boto3
+from botocore.exceptions import ClientError
 from PIL import Image
-
 import torch
 import torch.nn.functional as F
 
 from errors import S3ImageDoesNotExistError
 
 
-def get_sentence_embedding(tokenizer, embedding_model, device, sentence: str) -> torch.Tensor:
+def get_sentence_embedding(
+    tokenizer, embedding_model, device, sentence: str
+) -> torch.Tensor:
     inputs = tokenizer(
         sentence,
         return_tensors="pt",
@@ -41,3 +44,25 @@ def download_image_from_s3(s3, bucket_name, object_key) -> Image.Image:
         return Image.open(file_stream)
     except Exception as e:
         raise S3ImageDoesNotExistError(f"Image {object_key} does not exist in S3.")
+
+
+
+
+def get_secret() -> dict[str, str]:
+
+    secret_name = "app-docdb-secret"
+    region_name = "us-east-1"
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(service_name="secretsmanager", region_name=region_name)
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        raise e
+
+    secret = get_secret_value_response["SecretString"]
+    return secret
