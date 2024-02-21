@@ -1,4 +1,5 @@
 import io
+import json
 
 import boto3
 from botocore.exceptions import ClientError
@@ -65,4 +66,4 @@ def get_secret() -> dict[str, str]:
         raise e
 
     secret = get_secret_value_response["SecretString"]
-    return secret
+    return json.loads(secret)
