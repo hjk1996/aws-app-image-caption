@@ -4,6 +4,8 @@ import logging
 import json
 import boto3
 import time
+import signal
+
 
 from PIL import UnidentifiedImageError
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
@@ -19,12 +21,26 @@ from transformers import (
 from utils import download_image_from_s3, get_sentence_embedding
 from errors import S3ImageDoesNotExistError
 
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 
 logging.info("Loading Model")
+
+# 종료 플래그를 정의합니다.
+shutdown_flag = False
+
+
+def signal_handler(signum, frame):
+    global shutdown_flag
+    logging.info("SIGTERM received, shutting down...")
+    shutdown_flag = True
+
+
+# SIGTERM 신호 핸들러를 등록합니다.
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 # Initialize AWS services
@@ -93,12 +109,12 @@ def process_image_message(message) -> dict[str, str]:
         caption_embedding = get_sentence_embedding(
             tokenizer, embedding_model, device, caption
         )
-        logging.info(f"Caption embedding: {caption_embedding.size()}")
-
+        caption_embedding = caption_embedding.squeeze().detach().cpu().tolist()
         return {
             "user_id": user_id,
             "file_name": file_name,
             "caption": caption,
+            "caption_vector": caption_embedding,
         }
     except json.JSONDecodeError as e:
         logging.error(f"[{type(e)}]: Failed to decode JSON message.")
@@ -129,9 +145,35 @@ async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
         return False
 
 
+async def save_vector_to_opensearch(os_client: OpenSearch, data: dict) -> bool:
+    try:
+        response = os_client.index(
+            index=os.environ["OPENSEARCH_INDEX"],
+            body={
+                "user_id": data["user_id"],
+                "file_name": data["file_name"],
+                "caption_vector": data["caption_vector"],
+                "created_at": int(time.time()),
+            },
+        )
+        return True
+    except Exception as e:
+        logging.error(f"[{type(e)}]: Error indexing document in OpenSearch: {e}")
+        return False
+
+
+async def update_table_and_save_vector(
+    table, os_client: OpenSearch, data: dict[str, str]
+) -> bool:
+    result = await update_dynamodb_table(table, data)
+    if result:
+        result = await save_vector_to_opensearch(os_client, data)
+    return result
+
+
 async def main():
     logging.info("Starting the process.")
-    while True:
+    while not shutdown_flag:
         try:
             response = sqs.receive_message(
                 QueueUrl=queue_url, MaxNumberOfMessages=10, WaitTimeSeconds=20
@@ -140,7 +182,7 @@ async def main():
 
             if not messages:
                 logging.info("No messages to process. Sleeping for 5 seconds.")
-                time.sleep(5)
+                await asyncio.sleep(5)
                 continue
 
             captions = []
@@ -159,7 +201,12 @@ async def main():
 
             if captions:
                 results = await asyncio.gather(
-                    *[update_dynamodb_table(table, caption) for caption in captions]
+                    *[
+                        update_table_and_save_vector(
+                            table=table, os_client=os_client, data=caption
+                        )
+                        for caption in captions
+                    ]
                 )
                 logging.info(f"Added {sum(results)} items to the DynamoDB table.")
 
@@ -176,4 +223,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()
+        logging.info("Program exited gracefully")
