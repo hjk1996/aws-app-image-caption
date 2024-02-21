@@ -155,6 +155,7 @@ async def save_vector_to_opensearch(os_client: OpenSearch, data: dict) -> bool:
                 "created_at": int(time.time()),
             },
         )
+        
         return True
     except Exception as e:
         logging.error(f"[{type(e)}]: Error indexing document in OpenSearch: {e}")
