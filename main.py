@@ -6,6 +6,7 @@ import boto3
 import time
 
 from PIL import UnidentifiedImageError
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 import torch
 import torch.nn.functional as F
 from transformers import (
@@ -34,8 +35,20 @@ queue_url = os.environ["SQS_URL"]
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["DYNAMODB_TABLE_NAME"])
-
 logging.info("AWS services initialized")
+
+
+credentials = boto3.Session().get_credentials()
+auth = AWSV4SignerAuth(credentials=credentials, region=os.environ["AWS_REGION"])
+os_client = OpenSearch(
+    hosts=[{"host": os.environ["OPENSEARCH_HOST"], "port": 443}],
+    http_auth=auth,
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection,
+)
+logging.info("OpenSearch client initialized")
+
 
 logging.info("Loading Image Caption Model")
 # Load the model
@@ -75,7 +88,9 @@ def process_image_message(message) -> dict[str, str]:
         )
         caption = processor.decode(outputs[0], skip_special_tokens=True)
         logging.info(f"Image {object_key} processed. Caption: {caption}")
-        caption_embedding = get_sentence_embedding(tokenizer, embedding_model, device, caption)
+        caption_embedding = get_sentence_embedding(
+            tokenizer, embedding_model, device, caption
+        )
         logging.info(f"Caption embedding: {caption_embedding.size()}")
 
         return {
@@ -109,7 +124,7 @@ async def update_dynamodb_table(table, data: dict[str, str]) -> bool:
         return True
     except Exception as e:
         logging.error(f"[{type(e)}]: Error updating DynamoDB table: {e}")
-        return False    
+        return False
 
 
 async def main():
