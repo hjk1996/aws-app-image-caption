@@ -5,7 +5,7 @@ import json
 import boto3
 import time
 import signal
-
+from datetime import datetime
 
 import requests
 from PIL import UnidentifiedImageError
@@ -166,6 +166,7 @@ async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
                 "file_name": data["file_name"],
                 "caption": data["caption"],
                 "caption_vector": data["caption_vector"],
+                "created_at": datetime.now()
             }
         )
         logging.info(f"Inserted document with id: {result.inserted_id}")
