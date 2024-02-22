@@ -226,7 +226,7 @@ async def main():
 
             if valid_entries:
                 sqs.delete_message_batch(QueueUrl=queue_url, Entries=valid_entries)
-                logging.info(f"Deleted {len(entries)} messages from the queue.")
+                logging.info(f"Deleted {len(valid_entries)} messages from the queue.")
 
         except KeyboardInterrupt as e:
             logging.info(f"[{type(e)}]: Process interrupted by user.")
