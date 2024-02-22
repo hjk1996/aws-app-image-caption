@@ -20,7 +20,12 @@ from transformers import (
     AutoModel,
 )
 
-from utils import download_image_from_s3, get_sentence_embedding, get_secret, download_pem_file
+from utils import (
+    download_image_from_s3,
+    get_sentence_embedding,
+    get_secret,
+    download_pem_file,
+)
 from errors import S3ImageDoesNotExistError
 
 
@@ -84,7 +89,7 @@ def signal_handler(signum, frame):
     logging.info("SIGTERM received, shutting down...")
     shutdown_flag = True
     mongo_client.close()
-    
+
 
 # SIGTERM 신호 핸들러를 등록합니다.
 signal.signal(signal.SIGTERM, signal_handler)
@@ -159,6 +164,7 @@ async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
             {
                 "user_id": data["user_id"],
                 "file_name": data["file_name"],
+                "caption": data["caption"],
                 "caption_vector": data["caption_vector"],
             }
         )
@@ -167,9 +173,6 @@ async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
     except Exception as e:
         logging.error(f"[{type(e)}]: Error inserting document in MongoDB: {e}")
         return False
-
-
-
 
 
 async def update_table_and_save_vector(
