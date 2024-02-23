@@ -11,6 +11,7 @@ import requests
 from PIL import UnidentifiedImageError
 from pymongo import MongoClient
 from pymongo.collection import Collection
+from pymongo.errors import DuplicateKeyError
 import torch
 import torch.nn.functional as F
 from transformers import (
@@ -170,6 +171,9 @@ async def save_vector_to_mongodb(collection: Collection, data: dict) -> bool:
             }
         )
         logging.info(f"Inserted document with id: {result.inserted_id}")
+        return True
+    except DuplicateKeyError as e:
+        logging.error(f"[{type(e)}]: Document already exists in MongoDB.")
         return True
     except Exception as e:
         logging.error(f"[{type(e)}]: Error inserting document in MongoDB: {e}")
