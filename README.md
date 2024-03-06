@@ -18,11 +18,11 @@ k
 
 <img src="./image_caption_architecture.drawio.svg">
 
-# 개요
+### 개요
 
 본 애플리케이션은 AWS S3에 이미지가 업로드되는 이벤트를 감지하여 자동으로 이미지에 대한 캡션을 생성하고, 생성된 캡션을 벡터로 변환하여 Amazon DocumentDB에 저장하는 과정을 담당합니다. 이 아키텍처는 AWS S3, SNS, SQS, EKS, NAT Gateway, 그리고 DocumentDB를 활용합니다.
 
-# 아키텍처 컴포넌트
+### 아키텍처 컴포넌트
 
 1. Amazon S3: 이미지 파일 저장소로 사용되며, 새로운 이미지 업로드 시 이벤트를 발생시킵니다.
 2. Amazon SNS (Simple Notification Service): S3에서 발생한 이미지 업로드 이벤트를 수신하고 해당 이벤트를 Amazon SQS로 전달합니다.
@@ -33,7 +33,7 @@ k
 7. 텍스트 임베딩 모델: 생성된 캡션을 수치적 벡터로 변환하는데 사용됩니다. 이 벡터는 검색 작업을 위해서 사용합니다.
 8. Amazon DocumentDB: 생성된 캡션과 해당 벡터를 저장하는 NoSQL 문서 데이터베이스입니다. 프라이빗 서브넷 내에 위치하며, EKS worker node로부터 접근 가능합니다.
 
-# 데이터 플로우
+### 데이터 플로우
 
 1. 사용자가 업로드한 이미지가 S3에 저장됩니다.
 2. S3 업로드 이벤트는 Amazon SNS 토픽으로 전송됩니다.
