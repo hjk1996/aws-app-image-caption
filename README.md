@@ -14,7 +14,7 @@ k
 
 [![Video Title](http://img.youtube.com/vi/l_XaYF5AkM4/0.jpg)](https://www.youtube.com/watch?v=l_XaYF5AkM4 "Video Title")
 
-## 아키택처
+## 아키텍처
 
 <img src="./image_caption_architecture.drawio.svg">
 
