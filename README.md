@@ -14,10 +14,8 @@ k
 
 [![Video Title](http://img.youtube.com/vi/l_XaYF5AkM4/0.jpg)](https://www.youtube.com/watch?v=l_XaYF5AkM4 "Video Title")
 
-## 아키텍처
 
-- **CI/CD**
-
+## CI/CD
 <img src="./image_caption_cicd_pipeline.drawio.svg">
 
 1. **코드 푸시**
